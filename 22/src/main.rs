@@ -1,0 +1,81 @@
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, Read};
+
+const R: &str = "\u{001b}[31m"; // red (letter not in word)
+const G: &str = "\u{001b}[32m"; // green (correct position)
+const Y: &str = "\u{001b}[33m"; // yellow (wrong position)
+const RESET: &str = "\u{001b}[0m";
+
+const T: &str = "┌───┬───┬───┬───┬───┐";
+const M: &str = "├───┼───┼───┼───┼───┤";
+const B: &str = "└───┴───┴───┴───┴───┘";
+
+fn get_random_word() -> String {
+    // Load words from file
+    let file = File::open("words.txt").expect("no words.txt found");
+    let reader = BufReader::new(file);
+    let words: Vec<String> = reader.lines().map(|l| l.unwrap()).collect();
+
+    // Use /dev/random to pick index
+    let mut f = File::open("/dev/random").unwrap();
+    let mut buf = [0u8; 1];
+    f.read_exact(&mut buf).unwrap();
+    let idx = (buf[0] as usize) % words.len();
+
+    words[idx].clone()
+}
+
+fn color_guess(guess: &str, answer: &str) {
+    print!("│");
+    for (i, c) in guess.chars().enumerate() {
+        let code = if answer.chars().nth(i) == Some(c) {
+            G
+        } else if answer.contains(c) {
+            Y
+        } else {
+            R
+        };
+        print!(" {}{}{} │", code, c, RESET);
+    }
+    println!();
+}
+
+fn main() {
+    let answer = get_random_word();
+    let mut guesses: Vec<String> = vec![];
+
+    println!("Use lowercase only btw.");
+
+    while guesses.len() < 6 {
+        let mut guess = String::new();
+        io::stdin().read_line(&mut guess).unwrap();
+        let guess = guess.trim().to_string();
+
+        if guess.len() != 5 {
+            println!("Word must be 5 letters.");
+            continue;
+        }
+
+        guesses.push(guess.clone());
+
+        // Clear screen
+        print!("\x1B[2J\x1B[1;1H");
+
+        println!("{}", T);
+        for (i, g) in guesses.iter().enumerate() {
+            color_guess(g, &answer);
+            if i < guesses.len() - 1 {
+                println!("{}", M);
+            }
+        }
+        println!("{}", B);
+
+        if guess == answer {
+            println!("Winner!");
+            return;
+        }
+    }
+
+    println!("Game over :(  Answer was: {}", answer);
+
+}
